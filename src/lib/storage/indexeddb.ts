@@ -18,26 +18,39 @@ const STORES: StoreName[] = ['notes', 'notebooks', 'tags', 'attachments', 'blobs
 const tombKey = (kind: ItemKind, id: Id) => `${kind}:${id}`;
 const CHUNK = 200;
 
+let onBlocked: (() => void) | null = null;
+/** Meldet, wenn die Datenbank von einer anderen, noch geöffneten App-Version blockiert wird. */
+export function onDatabaseBlocked(fn: () => void) {
+  onBlocked = fn;
+}
+
 export class IndexedDbRepository implements NotesRepository {
   private db: Promise<IDBPDatabase<NotesDB>>;
 
   constructor(name = 'notizen') {
     this.db = openDB<NotesDB>(name, 2, {
-      upgrade(db, oldVersion) {
-        if (oldVersion < 1) {
-          db.createObjectStore('notes', { keyPath: 'id' });
-          db.createObjectStore('notebooks', { keyPath: 'id' });
-          db.createObjectStore('tags', { keyPath: 'id' });
-          db.createObjectStore('attachments', { keyPath: 'id' });
-          // Dateien getrennt von den Metadaten, damit der Start nicht alle Anhänge lädt
-          db.createObjectStore('blobs');
-          db.createObjectStore('settings');
-        }
-        if (oldVersion < 2) {
-          // für die Synchronisierung
-          db.createObjectStore('tombstones', { keyPath: 'key' });
-          db.createObjectStore('meta');
-        }
+      upgrade(db) {
+        // Fehlende Bereiche anlegen – unabhängig davon, von welchem Stand aus aktualisiert wird
+        const ensure = (name: StoreName, keyPath?: string) => {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, keyPath ? { keyPath } : undefined);
+        };
+        ensure('notes', 'id');
+        ensure('notebooks', 'id');
+        ensure('tags', 'id');
+        ensure('attachments', 'id');
+        // Dateien getrennt von den Metadaten, damit der Start nicht alle Anhänge lädt
+        ensure('blobs');
+        ensure('settings');
+        // für die Synchronisierung
+        ensure('tombstones', 'key');
+        ensure('meta');
+      },
+      // Eine ältere Version der App ist noch in einem anderen Tab geöffnet und hält die Datenbank fest
+      blocked: () => onBlocked?.(),
+      // Eine neuere Version will die Datenbank umbauen: Verbindung freigeben und neu laden
+      blocking(_current, _next, event) {
+        (event.target as IDBDatabase).close();
+        location.reload();
       },
     });
   }

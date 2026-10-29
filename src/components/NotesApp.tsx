@@ -121,7 +121,7 @@ export default function NotesApp() {
 
   if (!ready) {
     return (
-      <div className="flex h-dvh items-center justify-center text-sm text-muted" role="status">
+      <div className="flex h-dvh items-center justify-center text-sm text-muted" role="status" data-loading>
         Notizen werden geladen …
       </div>
     );
@@ -131,7 +131,7 @@ export default function NotesApp() {
     return (
       <div className="flex h-dvh items-center justify-center p-6">
         <div className="max-w-md rounded-2xl border border-line bg-surface p-6 text-center shadow-sm" role="alert">
-          <h1 className="text-lg font-semibold">Speicher nicht verfügbar</h1>
+          <h1 className="text-lg font-semibold">Notizen können nicht geladen werden</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">{loadError}</p>
           <button className="btn-primary mt-5" onClick={() => location.reload()}>
             Neu laden

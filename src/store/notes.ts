@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { getRepository } from '@/lib/storage';
+import { onDatabaseBlocked } from '@/lib/storage/indexeddb';
 import { createSeed } from '@/lib/seed';
 import { forgetAttachmentUrls } from '@/lib/attachments';
 import { notebookSubtree, referencedAttachments, type Filters, type View } from '@/lib/query';
@@ -171,12 +172,22 @@ function putNotes(list: Note[], immediate = false) {
 // ---------------------------------------------------------------------------
 // Start
 
+const BLOCKED_MESSAGE =
+  'Die App ist wahrscheinlich noch in einem anderen Fenster geöffnet (anderer Safari-Tab oder als App vom Home-Bildschirm) und blockiert die Aktualisierung des Speichers. Bitte alle anderen Fenster der App schließen – auf dem iPhone auch in der App-Übersicht nach oben wischen – und dann neu laden.';
+
 let initStarted = false;
 export async function init() {
   if (initStarted) return;
   initStarted = true;
+  // Hängt das Öffnen der Datenbank (z. B. weil eine ältere Version der App noch offen ist),
+  // nicht endlos „Wird geladen“ zeigen, sondern erklären, was zu tun ist.
+  const stuck = setTimeout(() => {
+    if (!get().ready) set({ ready: true, loadError: BLOCKED_MESSAGE });
+  }, 8000);
+  onDatabaseBlocked(() => set({ ready: true, loadError: BLOCKED_MESSAGE }));
   try {
     const data = await repo().loadAll();
+    clearTimeout(stuck);
     let { notes, notebooks, tags, settings } = data;
     if (!settings.seeded) {
       if (!notes.length) {
@@ -192,6 +203,7 @@ export async function init() {
     }
     set({
       ready: true,
+      loadError: null,
       notes: byId(notes),
       notebooks: byId(notebooks),
       tags: byId(tags),
@@ -201,6 +213,7 @@ export async function init() {
     applyTheme(settings.theme);
     navigator.storage?.persist?.().catch(() => undefined);
   } catch (e) {
+    clearTimeout(stuck);
     console.error(e);
     set({
       ready: true,
