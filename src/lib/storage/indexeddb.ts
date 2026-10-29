@@ -1,5 +1,5 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import { DEFAULT_SETTINGS, type Attachment, type Id, type Note, type Notebook, type Settings, type Tag } from '../types';
+import { DEFAULT_SETTINGS, type Attachment, type Id, type ItemKind, type Note, type Notebook, type Settings, type Tag, type Tombstone } from '../types';
 import type { ImportBatch, NotesRepository } from './repository';
 
 interface NotesDB extends DBSchema {
@@ -9,25 +9,35 @@ interface NotesDB extends DBSchema {
   attachments: { key: Id; value: Attachment };
   blobs: { key: Id; value: Blob };
   settings: { key: string; value: Settings };
+  tombstones: { key: string; value: Tombstone & { key: string } };
+  meta: { key: string; value: unknown };
 }
 
-type StoreName = 'notes' | 'notebooks' | 'tags' | 'attachments' | 'blobs' | 'settings';
-const STORES: StoreName[] = ['notes', 'notebooks', 'tags', 'attachments', 'blobs', 'settings'];
+type StoreName = 'notes' | 'notebooks' | 'tags' | 'attachments' | 'blobs' | 'settings' | 'tombstones' | 'meta';
+const STORES: StoreName[] = ['notes', 'notebooks', 'tags', 'attachments', 'blobs', 'settings', 'tombstones', 'meta'];
+const tombKey = (kind: ItemKind, id: Id) => `${kind}:${id}`;
 const CHUNK = 200;
 
 export class IndexedDbRepository implements NotesRepository {
   private db: Promise<IDBPDatabase<NotesDB>>;
 
   constructor(name = 'notizen') {
-    this.db = openDB<NotesDB>(name, 1, {
-      upgrade(db) {
-        db.createObjectStore('notes', { keyPath: 'id' });
-        db.createObjectStore('notebooks', { keyPath: 'id' });
-        db.createObjectStore('tags', { keyPath: 'id' });
-        db.createObjectStore('attachments', { keyPath: 'id' });
-        // Dateien getrennt von den Metadaten, damit der Start nicht alle Anhänge lädt
-        db.createObjectStore('blobs');
-        db.createObjectStore('settings');
+    this.db = openDB<NotesDB>(name, 2, {
+      upgrade(db, oldVersion) {
+        if (oldVersion < 1) {
+          db.createObjectStore('notes', { keyPath: 'id' });
+          db.createObjectStore('notebooks', { keyPath: 'id' });
+          db.createObjectStore('tags', { keyPath: 'id' });
+          db.createObjectStore('attachments', { keyPath: 'id' });
+          // Dateien getrennt von den Metadaten, damit der Start nicht alle Anhänge lädt
+          db.createObjectStore('blobs');
+          db.createObjectStore('settings');
+        }
+        if (oldVersion < 2) {
+          // für die Synchronisierung
+          db.createObjectStore('tombstones', { keyPath: 'key' });
+          db.createObjectStore('meta');
+        }
       },
     });
   }
@@ -69,6 +79,35 @@ export class IndexedDbRepository implements NotesRepository {
     const db = await this.db;
     const tx = db.transaction(['attachments', 'blobs'], 'readwrite');
     await Promise.all([tx.objectStore('attachments').put(meta), tx.objectStore('blobs').put(blob, meta.id), tx.done]);
+  }
+
+  saveAttachmentMeta = (metas: Attachment[]) => this.putAll('attachments', metas);
+
+  async saveAttachmentBlob(id: Id, blob: Blob) {
+    await (await this.db).put('blobs', blob, id);
+  }
+
+  async addTombstones(items: Tombstone[]) {
+    if (!items.length) return;
+    const db = await this.db;
+    const tx = db.transaction('tombstones', 'readwrite');
+    await Promise.all([...items.map(t => tx.store.put({ ...t, key: tombKey(t.kind, t.id) })), tx.done]);
+  }
+
+  async getTombstones() {
+    return (await (await this.db).getAll('tombstones')).map(({ kind, id, changedAt }) => ({ kind, id, changedAt }));
+  }
+
+  async removeTombstones(items: { kind: ItemKind; id: Id }[]) {
+    await this.deleteAll('tombstones', items.map(t => tombKey(t.kind, t.id)));
+  }
+
+  async getMeta<T>(key: string) {
+    return ((await (await this.db).get('meta', key)) as T | undefined) ?? null;
+  }
+
+  async setMeta<T>(key: string, value: T) {
+    await (await this.db).put('meta', value, key);
   }
 
   async getAttachmentBlob(id: Id) {

@@ -4,7 +4,7 @@
 
 import { zipSync, strToU8 } from 'fflate';
 import { htmlToMarkdown, safeFileName } from './markdown';
-import { getRepository } from './storage';
+import { loadAttachmentBlob } from './attachments';
 import { notebookPath } from './query';
 import { newId, type Attachment, type Id, type Note, type Notebook, type Tag } from './types';
 
@@ -147,7 +147,7 @@ export async function exportJex(data: ExportData, onProgress?: (msg: string) => 
   const files = usedAttachments(notes, data.attachments);
   for (let i = 0; i < files.length; i++) {
     const a = data.attachments[files[i]];
-    const blob = await getRepository().getAttachmentBlob(a.id);
+    const blob = await loadAttachmentBlob(a.id);
     if (!blob) continue;
     const ext = extOf(a);
     item(a.id, serialize(a.name, '', { id: a.id, mime: a.mime, filename: a.name, ...times(a.createdAt), file_extension: ext, ...ENC, encryption_blob_encrypted: 0, size: blob.size, share_id: '', type_: 4 }));
@@ -180,7 +180,7 @@ export async function exportMarkdownZip(data: ExportData, onProgress?: (msg: str
   const ids = usedAttachments(notes, data.attachments);
   for (let i = 0; i < ids.length; i++) {
     const a = data.attachments[ids[i]];
-    const blob = await getRepository().getAttachmentBlob(a.id);
+    const blob = await loadAttachmentBlob(a.id);
     if (!blob) continue;
     const base = safeFileName(a.name.replace(/\.[^.]+$/, '')) + '.' + extOf(a);
     const path = unique(`_Anhänge/${base}`);

@@ -1,4 +1,4 @@
-import type { Attachment, Id, Note, Notebook, Settings, Snapshot, Tag } from '../types';
+import type { Attachment, Id, ItemKind, Note, Notebook, Settings, Snapshot, Tag, Tombstone } from '../types';
 
 export interface ImportBatch {
   notes: Note[];
@@ -25,8 +25,20 @@ export interface NotesRepository {
   deleteTags(ids: Id[]): Promise<void>;
 
   saveAttachment(meta: Attachment, blob: Blob): Promise<void>;
+  /** Nur Metadaten (z. B. von einem anderen Gerät; die Datei wird bei Bedarf nachgeladen) */
+  saveAttachmentMeta(metas: Attachment[]): Promise<void>;
+  saveAttachmentBlob(id: Id, blob: Blob): Promise<void>;
   getAttachmentBlob(id: Id): Promise<Blob | null>;
   deleteAttachments(ids: Id[]): Promise<void>;
+
+  /** Löschmarken für die Synchronisierung */
+  addTombstones(items: Tombstone[]): Promise<void>;
+  getTombstones(): Promise<Tombstone[]>;
+  removeTombstones(items: { kind: ItemKind; id: Id }[]): Promise<void>;
+
+  /** Kleine Verwaltungswerte, z. B. der Stand der Synchronisierung */
+  getMeta<T>(key: string): Promise<T | null>;
+  setMeta<T>(key: string, value: T): Promise<void>;
 
   saveSettings(settings: Settings): Promise<void>;
 

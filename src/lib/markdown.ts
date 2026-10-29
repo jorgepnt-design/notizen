@@ -1,7 +1,6 @@
 import TurndownService from 'turndown';
 import { tables, strikethrough } from 'turndown-plugin-gfm';
-import { NOTE_PREFIX, attachmentIdOf, blobToDataUrl } from './attachments';
-import { getRepository } from './storage';
+import { NOTE_PREFIX, attachmentIdOf, blobToDataUrl, loadAttachmentBlob } from './attachments';
 import type { Attachment, Id, Note } from './types';
 
 function createTurndown() {
@@ -67,7 +66,7 @@ export async function noteToMarkdown(note: Note, attachments: Record<Id, Attachm
   const dataUrls = new Map<Id, string>();
   for (const m of note.content.matchAll(/attachment:\/\/([0-9a-zA-Z]+)/g)) {
     if (dataUrls.has(m[1]) || !attachments[m[1]]?.mime.startsWith('image/')) continue;
-    const blob = await getRepository().getAttachmentBlob(m[1]);
+    const blob = await loadAttachmentBlob(m[1]);
     if (blob && blob.size <= 8 * 1024 * 1024) dataUrls.set(m[1], await blobToDataUrl(blob));
   }
   const body = htmlToMarkdown(note.content, {

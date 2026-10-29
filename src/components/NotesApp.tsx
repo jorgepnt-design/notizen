@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileUp, Loader2 } from 'lucide-react';
-import { createNote, flushSaves, hasUnsavedChanges, importJoplin, init, notify, useNotes } from '@/store/notes';
+import { createNote, flushSaves, hasUnsavedChanges, importJoplin, init, notify, syncHost, useNotes } from '@/store/notes';
+import { initSync } from '@/lib/sync';
 import { plural } from '@/lib/format';
 import { Sidebar } from './Sidebar';
 import { NoteList } from './NoteList';
@@ -26,7 +27,12 @@ export default function NotesApp() {
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => void init(), []);
+  useEffect(() => {
+    void init().then(() => {
+      if (!useNotes.getState().loadError)
+        initSync(syncHost, n => notify(`${plural(n, 'Änderung', 'Änderungen')} von einem anderen Gerät übernommen.`));
+    });
+  }, []);
 
   const newNote = useCallback(() => {
     createNote();

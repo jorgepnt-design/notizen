@@ -9,6 +9,8 @@ import { plural } from '@/lib/format';
 import { fileSize } from '@/lib/format';
 import type { Theme } from '@/lib/types';
 import { Modal } from './ui/Modal';
+import { AccountSection } from './Account';
+import { signOut, useSync } from '@/lib/sync';
 import { confirmDialog } from './ui/dialogs';
 
 const THEMES: { value: Theme; label: string; icon: React.ReactNode }[] = [
@@ -22,6 +24,7 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
   const noteCount = useNotes(s => Object.keys(s.notes).length);
   const attachmentCount = useNotes(s => Object.keys(s.attachments).length);
   const counts = { notes: noteCount, attachments: attachmentCount };
+  const signedIn = !!useSync(s => s.user);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
   const [persisted, setPersisted] = useState<boolean | null>(null);
 
@@ -51,11 +54,14 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
   const wipe = async () => {
     const ok = await confirmDialog({
       title: 'Alle Daten löschen?',
-      message: `Alle ${counts.notes} Notizen, Notizbücher, Schlagwörter und Anhänge werden von diesem Gerät entfernt. Das lässt sich nicht rückgängig machen.`,
+      message: signedIn
+        ? `Alle Notizen, Notizbücher, Schlagwörter und Anhänge werden von diesem Gerät entfernt und du wirst abgemeldet. In deinem Konto bleiben sie erhalten und kommen nach der nächsten Anmeldung zurück.`
+        : `Alle ${counts.notes} Notizen, Notizbücher, Schlagwörter und Anhänge werden von diesem Gerät entfernt. Das lässt sich nicht rückgängig machen.`,
       confirmLabel: 'Alles endgültig löschen',
       danger: true,
     });
     if (!ok) return;
+    if (signedIn) await signOut();
     await deleteAllData();
     notify('Alle Daten wurden gelöscht.');
     onClose();
@@ -64,6 +70,8 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
   return (
     <Modal title="Einstellungen" onClose={onClose} size="lg" footer={<button className="btn-primary" onClick={onClose}>Fertig</button>}>
       <div className="space-y-7">
+        <AccountSection />
+
         <section aria-labelledby="set-theme">
           <h3 id="set-theme" className="mb-2 font-semibold">
             Darstellung
@@ -90,11 +98,23 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
           <div className="flex gap-3 rounded-xl border border-accent/30 bg-accent-soft/60 p-4 leading-relaxed">
             <HardDrive size={20} className="mt-0.5 shrink-0 text-accent" />
             <div className="space-y-1.5">
-              <p className="font-medium">Deine Notizen werden zurzeit nur auf diesem Gerät gespeichert.</p>
-              <p className="text-muted">
-                Alles liegt im lokalen Speicher dieses Browsers (IndexedDB). Es wird nichts hochgeladen, und es gibt noch keine Synchronisierung
-                zwischen Geräten oder Browsern. Wenn du die Website-Daten dieser Seite im Browser löschst, sind auch die Notizen weg.
-              </p>
+              {signedIn ? (
+                <>
+                  <p className="font-medium">Deine Notizen liegen auf diesem Gerät und in deinem Konto.</p>
+                  <p className="text-muted">
+                    Dieses Gerät hält eine vollständige Kopie im Browser-Speicher (IndexedDB), damit die App auch offline funktioniert. Änderungen
+                    werden automatisch mit deinem Konto abgeglichen.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="font-medium">Deine Notizen werden zurzeit nur auf diesem Gerät gespeichert.</p>
+                  <p className="text-muted">
+                    Alles liegt im lokalen Speicher dieses Browsers (IndexedDB). Ohne Anmeldung wird nichts hochgeladen und nichts zwischen Geräten
+                    abgeglichen. Wenn du die Website-Daten dieser Seite im Browser löschst, sind auch die Notizen weg.
+                  </p>
+                </>
+              )}
               <p className="text-muted">
                 {counts.notes} Notizen · {counts.attachments} Anhänge
                 {usage && usage.quota > 0 && ` · ${fileSize(usage.used)} von ca. ${fileSize(usage.quota)} belegt`}
@@ -182,7 +202,9 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
           <h3 id="set-danger" className="mb-1 font-semibold text-danger">
             Alle Daten löschen
           </h3>
-          <p className="mb-3 text-muted">Entfernt alle Notizen, Notizbücher, Schlagwörter und Anhänge von diesem Gerät.</p>
+          <p className="mb-3 text-muted">
+            Entfernt alle Notizen, Notizbücher, Schlagwörter und Anhänge von diesem Gerät{signedIn ? ' und meldet dich ab. Dein Konto bleibt unverändert' : ''}.
+          </p>
           <button className="btn-danger" onClick={wipe}>
             Alle Daten löschen …
           </button>

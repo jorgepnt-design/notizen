@@ -7,7 +7,6 @@ import {
   FileText,
   FolderInput,
   Hash,
-  HardDrive,
   Inbox,
   MoreHorizontal,
   Pencil,
@@ -35,6 +34,7 @@ import { notebookSubtree, type View } from '@/lib/query';
 import type { Id, Notebook } from '@/lib/types';
 import { confirmDialog, promptDialog } from './ui/dialogs';
 import { Menu } from './ui/Menu';
+import { AccountFooter } from './Account';
 import { plural } from '@/lib/format';
 
 export const DND_NOTE = 'application/x-notizen-note';
@@ -341,12 +341,10 @@ export function Sidebar({ onNavigate, onNewNote, onOpenSettings, onClose }: Prop
       </div>
 
       <div className="border-t border-line px-2 py-2">
-        <button className="btn-ghost w-full justify-start" onClick={onOpenSettings}>
+        <AccountFooter onOpenSettings={onOpenSettings} />
+        <button className="btn-ghost mt-1 w-full justify-start" onClick={onOpenSettings}>
           <Settings size={16} /> Einstellungen
         </button>
-        <p className="flex items-center gap-1.5 px-3 pb-1 text-[11px] text-muted">
-          <HardDrive size={12} /> Nur auf diesem Gerät gespeichert
-        </p>
       </div>
     </nav>
   );

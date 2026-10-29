@@ -20,6 +20,7 @@ const log = (...a) => console.log('✔', ...a);
   await page.goto(URL);
   await page.getByText('Willkommen bei Notizen 👋').first().waitFor();
   await expect(list.locator('[data-note]').count().then(n => n === 5), 'Beispielnotizen beim ersten Start (5)');
+  await expect(page.locator('nav').getByRole('button', { name: 'Mit Google anmelden' }).isVisible(), 'Knopf „Mit Google anmelden“ in der Seitenleiste');
   await page.screenshot({ path: shots + '/1-desktop.png' });
 
   // Neue Notiz per Tastenkürzel

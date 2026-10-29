@@ -52,6 +52,7 @@ interface Props {
 export function NoteEditorPane({ onBack }: Props) {
   const selectedId = useNotes(s => s.selectedId);
   const note = useNotes(s => (s.selectedId ? s.notes[s.selectedId] : null));
+  const remoteRev = useNotes(s => (s.selectedId ? s.remoteRev[s.selectedId] ?? 0 : 0));
 
   if (!note || !selectedId) {
     return (
@@ -62,8 +63,9 @@ export function NoteEditorPane({ onBack }: Props) {
       </div>
     );
   }
-  // key: Beim Wechsel der Notiz wird der Editor neu aufgebaut – vorher speichert er seinen Stand.
-  return <NoteEditor key={note.id} note={note} onBack={onBack} />;
+  // key: Beim Wechsel der Notiz (oder einer Änderung von einem anderen Gerät) wird der Editor
+  // neu aufgebaut – vorher speichert er seinen Stand.
+  return <NoteEditor key={`${note.id}:${remoteRev}`} note={note} onBack={onBack} />;
 }
 
 function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {

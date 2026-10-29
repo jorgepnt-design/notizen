@@ -6,9 +6,13 @@ import { createSeed } from '@/lib/seed';
 import { forgetAttachmentUrls } from '@/lib/attachments';
 import { notebookSubtree, referencedAttachments, type Filters, type View } from '@/lib/query';
 import { importJex, type ImportStats } from '@/lib/jex/joplin';
+import { htmlToText } from '@/lib/html';
+import { requestSync } from '@/lib/sync';
+import type { RemoteChanges, SyncHost } from '@/lib/sync/engine';
 import {
   DEFAULT_SETTINGS,
   newId,
+  type ItemKind,
   type Attachment,
   type Id,
   type Note,
@@ -45,6 +49,8 @@ interface State {
   saveState: SaveState;
   lastSavedAt: number | null;
   toasts: Toast[];
+  /** Zähler je Notiz, erhöht bei Änderungen von anderen Geräten – baut den Editor neu auf */
+  remoteRev: Record<Id, number>;
 }
 
 const byId = <T extends { id: Id }>(list: T[]) => Object.fromEntries(list.map(x => [x.id, x])) as Record<Id, T>;
@@ -69,11 +75,23 @@ export const useNotes = create<State>(() => ({
   saveState: 'saved',
   lastSavedAt: null,
   toasts: [],
+  remoteRev: {},
 }));
 
 const get = useNotes.getState;
 const set = useNotes.setState;
 const repo = () => getRepository();
+
+/** Markiert einen Datensatz als geändert (für die Synchronisierung). */
+const stamp = <T extends object>(x: T): T => ({ ...x, changedAt: Date.now() });
+
+async function tombstone(kind: ItemKind, ids: Id[]) {
+  const changedAt = Date.now();
+  await repo().addTombstones(ids.map(id => ({ kind, id, changedAt })));
+}
+
+/** Nach jeder gespeicherten lokalen Änderung: Synchronisierung anstoßen (falls angemeldet). */
+const changed = () => requestSync();
 
 // ---------------------------------------------------------------------------
 // Meldungen
@@ -132,6 +150,7 @@ export function flushSaves(): Promise<void> {
     try {
       await repo().saveNotes(live);
       if (!pending.size) set({ saveState: 'saved', lastSavedAt: Date.now() });
+      changed();
     } catch (e) {
       console.error(e);
       ids.forEach(id => pending.add(id)); // beim nächsten Versuch erneut speichern
@@ -143,6 +162,7 @@ export function flushSaves(): Promise<void> {
 
 function putNotes(list: Note[], immediate = false) {
   if (!list.length) return;
+  list = list.map(stamp);
   set(s => ({ notes: { ...s.notes, ...byId(list) } }));
   scheduleSave(list.map(n => n.id));
   if (immediate) void flushSaves();
@@ -165,6 +185,7 @@ export async function init() {
         await repo().saveTags(seed.tags);
         await repo().saveNotes(seed.notes);
         ({ notes, notebooks, tags } = { notes: seed.notes, notebooks: seed.notebooks, tags: seed.tags });
+        settings = { ...settings, seedIds: [...seed.notes, ...seed.notebooks, ...seed.tags].map(x => x.id) };
       }
       settings = { ...settings, seeded: true };
       await repo().saveSettings(settings);
@@ -306,7 +327,10 @@ async function purgeNotes(ids: Id[]) {
   ids.forEach(id => pending.delete(id));
   const rest = Object.values(get().notes).filter(n => !gone.has(n.id));
   set(s => ({ notes: byId(rest), selectedId: s.selectedId && gone.has(s.selectedId) ? null : s.selectedId }));
-  await persist('Das Löschen', () => repo().deleteNotes(ids));
+  await persist('Das Löschen', async () => {
+    await repo().deleteNotes(ids);
+    await tombstone('note', ids);
+  });
   // Anhänge, die keine Notiz mehr verwendet, ebenfalls entfernen
   const used = referencedAttachments(rest);
   const orphans = Object.keys(get().attachments).filter(id => !used.has(id));
@@ -314,7 +338,9 @@ async function purgeNotes(ids: Id[]) {
     set(s => ({ attachments: omit(s.attachments, orphans) }));
     forgetAttachmentUrls(orphans);
     await repo().deleteAttachments(orphans).catch(console.error);
+    await tombstone('attachment', orphans).catch(console.error);
   }
+  changed();
 }
 
 export const deleteNoteForever = (id: Id) => purgeNotes([id]);
@@ -325,24 +351,27 @@ export const emptyTrash = () => purgeNotes(Object.values(get().notes).filter(n =
 
 export async function createNotebook(name: string, parentId: Id | null = null) {
   const now = Date.now();
-  const nb: Notebook = { id: newId(), name: name.trim(), parentId, createdAt: now, updatedAt: now };
+  const nb: Notebook = stamp({ id: newId(), name: name.trim(), parentId, createdAt: now, updatedAt: now });
   set(s => ({ notebooks: { ...s.notebooks, [nb.id]: nb } }));
   await persist('Das Notizbuch', () => repo().saveNotebooks([nb]));
+  changed();
   return nb;
 }
 
 export async function renameNotebook(id: Id, name: string) {
-  const nb = { ...get().notebooks[id], name: name.trim(), updatedAt: Date.now() };
+  const nb = stamp({ ...get().notebooks[id], name: name.trim(), updatedAt: Date.now() });
   set(s => ({ notebooks: { ...s.notebooks, [id]: nb } }));
   await persist('Das Notizbuch', () => repo().saveNotebooks([nb]));
+  changed();
 }
 
 export async function moveNotebook(id: Id, parentId: Id | null) {
   const { notebooks } = get();
   if (parentId && notebookSubtree(id, notebooks).has(parentId)) return;
-  const nb = { ...notebooks[id], parentId, updatedAt: Date.now() };
+  const nb = stamp({ ...notebooks[id], parentId, updatedAt: Date.now() });
   set(s => ({ notebooks: { ...s.notebooks, [id]: nb } }));
   await persist('Das Notizbuch', () => repo().saveNotebooks([nb]));
+  changed();
 }
 
 /** Löscht ein Notizbuch. Seine Notizen wandern nach „Unsortiert“, Unter-Notizbücher eine Ebene nach oben. */
@@ -351,7 +380,7 @@ export async function deleteNotebook(id: Id) {
   const nb = notebooks[id];
   if (!nb) return;
   const moved = Object.values(notes).filter(n => n.notebookId === id).map(n => ({ ...n, notebookId: null }));
-  const children = Object.values(notebooks).filter(c => c.parentId === id).map(c => ({ ...c, parentId: nb.parentId }));
+  const children = Object.values(notebooks).filter(c => c.parentId === id).map(c => stamp({ ...c, parentId: nb.parentId }));
   set(s => ({
     notebooks: { ...omit(s.notebooks, [id]), ...byId(children) },
     view: view.type === 'notebook' && view.id === id ? { type: 'unsorted' } : s.view,
@@ -361,7 +390,9 @@ export async function deleteNotebook(id: Id) {
   await persist('Das Notizbuch', async () => {
     await repo().saveNotebooks(children);
     await repo().deleteNotebooks([id]);
+    await tombstone('notebook', [id]);
   });
+  changed();
   return moved.length;
 }
 
@@ -378,10 +409,11 @@ export async function addTagToNote(noteId: Id, name: string) {
   if (!name) return;
   let tag = findTag(name);
   if (!tag) {
-    tag = { id: newId(), name, createdAt: Date.now() };
+    tag = stamp({ id: newId(), name, createdAt: Date.now() });
     const t = tag;
     set(s => ({ tags: { ...s.tags, [t.id]: t } }));
     await persist('Das Schlagwort', () => repo().saveTags([t]));
+    changed();
   }
   const n = get().notes[noteId];
   if (n && !n.tagIds.includes(tag.id)) patchNote(noteId, { tagIds: [...n.tagIds, tag.id] });
@@ -399,9 +431,10 @@ export async function renameTag(id: Id, name: string) {
     notify(`Es gibt bereits ein Schlagwort „${other.name}“.`, 'error');
     return;
   }
-  const tag = { ...get().tags[id], name };
+  const tag = stamp({ ...get().tags[id], name });
   set(s => ({ tags: { ...s.tags, [id]: tag } }));
   await persist('Das Schlagwort', () => repo().saveTags([tag]));
+  changed();
 }
 
 export async function deleteTag(id: Id) {
@@ -412,16 +445,21 @@ export async function deleteTag(id: Id) {
     filters: s.filters.tagId === id ? {} : s.filters,
   }));
   putNotes(affected, true);
-  await persist('Das Schlagwort', () => repo().deleteTags([id]));
+  await persist('Das Schlagwort', async () => {
+    await repo().deleteTags([id]);
+    await tombstone('tag', [id]);
+  });
+  changed();
 }
 
 // ---------------------------------------------------------------------------
 // Anhänge
 
 export async function addAttachment(file: File): Promise<Attachment> {
-  const meta: Attachment = { id: newId(), name: file.name || 'Datei', mime: file.type || 'application/octet-stream', size: file.size, createdAt: Date.now() };
+  const meta: Attachment = stamp({ id: newId(), name: file.name || 'Datei', mime: file.type || 'application/octet-stream', size: file.size, createdAt: Date.now() });
   await persist('Der Anhang', () => repo().saveAttachment(meta, file));
   set(s => ({ attachments: { ...s.attachments, [meta.id]: meta } }));
+  changed();
   return meta;
 }
 
@@ -434,6 +472,8 @@ export async function importJoplin(file: File, onProgress: (msg: string) => void
   // Favoriten/Anheften bleiben bei erneutem Import derselben Notizen erhalten
   const before = get().notes;
   for (const n of batch.notes) if (before[n.id]) Object.assign(n, { favorite: before[n.id].favorite, pinned: before[n.id].pinned });
+  const t = Date.now();
+  for (const x of [...batch.notes, ...batch.notebooks, ...batch.tags, ...batch.attachments.map(a => a.meta)]) x.changedAt = t;
   await repo().importBatch(batch, (done, total) => onProgress(`Wird gespeichert … ${Math.round((done / Math.max(total, 1)) * 100)} %`));
   forgetAttachmentUrls(batch.attachments.map(a => a.meta.id));
   set(s => ({
@@ -447,6 +487,7 @@ export async function importJoplin(file: File, onProgress: (msg: string) => void
     selectedId: null,
   }));
   navigator.storage?.persist?.().catch(() => undefined);
+  changed();
   return stats;
 }
 
@@ -460,3 +501,48 @@ export async function deleteAllData() {
   await repo().saveSettings(settings);
   set({ notes: {}, notebooks: {}, tags: {}, attachments: {}, settings, view: { type: 'all' }, filters: {}, query: '', selectedId: null, saveState: 'saved' });
 }
+
+// ---------------------------------------------------------------------------
+// Synchronisierung: Schnittstelle für src/lib/sync
+
+export const syncHost: SyncHost = {
+  async local() {
+    await flushSaves();
+    const s = get();
+    return { notes: Object.values(s.notes), notebooks: Object.values(s.notebooks), tags: Object.values(s.tags), attachments: Object.values(s.attachments) };
+  },
+
+  async apply(ch: RemoteChanges) {
+    await flushSaves();
+    const del = (kind: ItemKind) => ch.deleted.filter(d => d.kind === kind).map(d => d.id);
+    const [dNotes, dNotebooks, dTags, dAttachments] = [del('note'), del('notebook'), del('tag'), del('attachment')];
+    for (const n of ch.notes) n.text ||= htmlToText(n.content);
+
+    const r = repo();
+    await r.saveNotebooks(ch.notebooks);
+    await r.saveTags(ch.tags);
+    await r.saveAttachmentMeta(ch.attachments);
+    await r.saveNotes(ch.notes);
+    await r.deleteNotes(dNotes);
+    await r.deleteNotebooks(dNotebooks);
+    await r.deleteTags(dTags);
+    await r.deleteAttachments(dAttachments);
+    forgetAttachmentUrls([...dAttachments, ...ch.attachments.map(a => a.id)]);
+
+    set(s => {
+      const remoteRev = { ...s.remoteRev };
+      for (const n of ch.notes) remoteRev[n.id] = (remoteRev[n.id] ?? 0) + 1;
+      const notes = omit({ ...s.notes, ...byId(ch.notes) }, dNotes);
+      return {
+        notes,
+        notebooks: omit({ ...s.notebooks, ...byId(ch.notebooks) }, dNotebooks),
+        tags: omit({ ...s.tags, ...byId(ch.tags) }, dTags),
+        attachments: omit({ ...s.attachments, ...byId(ch.attachments) }, dAttachments),
+        remoteRev,
+        selectedId: s.selectedId && !notes[s.selectedId] ? null : s.selectedId,
+      };
+    });
+  },
+
+  seedIds: () => get().settings.seedIds ?? [],
+};

@@ -16,6 +16,8 @@ export interface Note {
   updatedAt: number;
   /** gesetzt = liegt im Papierkorb */
   deletedAt: number | null;
+  /** Zeitpunkt der letzten Änderung jeglicher Art (für die Synchronisierung: neuester Stand gewinnt) */
+  changedAt?: number;
 }
 
 export interface Notebook {
@@ -24,12 +26,14 @@ export interface Notebook {
   parentId: Id | null;
   createdAt: number;
   updatedAt: number;
+  changedAt?: number;
 }
 
 export interface Tag {
   id: Id;
   name: string;
   createdAt: number;
+  changedAt?: number;
 }
 
 /** Metadaten einer angehängten Datei; die Datei selbst liegt getrennt als Blob. */
@@ -39,6 +43,7 @@ export interface Attachment {
   mime: string;
   size: number;
   createdAt: number;
+  changedAt?: number;
 }
 
 export type SortKey = 'updated' | 'created' | 'title';
@@ -49,7 +54,21 @@ export interface Settings {
   sort: SortKey;
   /** Beispielnotizen wurden bereits einmal angelegt */
   seeded: boolean;
+  /** IDs der Beispielinhalte – werden bei der ersten Synchronisierung mit einem gefüllten Konto entfernt */
+  seedIds?: Id[];
 }
+
+export type ItemKind = 'note' | 'notebook' | 'tag' | 'attachment';
+
+/** Löschmarke: sorgt dafür, dass eine Löschung auch auf anderen Geräten ankommt */
+export interface Tombstone {
+  kind: ItemKind;
+  id: Id;
+  changedAt: number;
+}
+
+/** Zeitpunkt der letzten Änderung, auch für ältere Datensätze ohne changedAt */
+export const changedAtOf = (x: { changedAt?: number; updatedAt?: number; createdAt: number }) => x.changedAt ?? x.updatedAt ?? x.createdAt;
 
 export const DEFAULT_SETTINGS: Settings = { theme: 'system', sort: 'updated', seeded: false };
 

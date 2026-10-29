@@ -27,7 +27,7 @@ Der Ordner `out/` kann auf jedem statischen Hosting liegen (z. B. Vercel, Netlif
 ```bash
 npm run typecheck    # TypeScript
 npm run lint         # ESLint
-npm test             # Unit-Tests (Vitest): Joplin-Import, Suche, Sortierung
+npm test             # Unit-Tests (Vitest): Joplin-Import, Export, Suche, Sortierung, Synchronisierung
 npm run check        # alles oben plus Produktions-Build
 ```
 
@@ -87,27 +87,54 @@ Geprüft werden unter anderem: Beispielnotizen beim ersten Start, Notiz anlegen 
 | `Strg`/`⌘` + Klick | Link im Editor öffnen |
 | `Esc` | Dialog oder Menü schließen |
 
-## Datenspeicherung
+## Datenspeicherung und Synchronisierung
 
-**Alle Daten bleiben auf dem Gerät.** Notizen, Notizbücher, Schlagwörter, Anhänge und Einstellungen liegen in der IndexedDB des Browsers (Datenbank `notizen`). Es gibt kein Benutzerkonto, nichts wird hochgeladen, und es gibt (noch) keine Synchronisierung zwischen Geräten oder Browsern.
+**Ohne Anmeldung** bleiben alle Daten auf dem Gerät: Notizen, Notizbücher, Schlagwörter, Anhänge und Einstellungen liegen in der IndexedDB des Browsers (Datenbank `notizen`). Wer die Website-Daten der Seite löscht oder im privaten Modus arbeitet, verliert sie. Deshalb regelmäßig über *Einstellungen → Notizen exportieren* eine .jex-Sicherung anlegen.
 
-- Die Daten bleiben nach Neuladen und Neustart erhalten. Die App bittet den Browser um dauerhaften Speicher (`navigator.storage.persist()`).
-- Wer die Website-Daten der Seite löscht oder im privaten Modus arbeitet, verliert die Notizen. Deshalb regelmäßig über *Einstellungen → Notizen exportieren* eine .jex-Sicherung anlegen.
-- Anhänge werden getrennt von den Notizen als Blobs gespeichert und erst beim Anzeigen geladen.
-- Änderungen werden gebündelt nach 0,5 Sekunden gespeichert, beim Wechsel der Notiz, beim Verlassen der Seite und beim Wechsel in den Hintergrund sofort.
+**Mit Google-Anmeldung** werden die Daten zusätzlich mit dem eigenen Konto abgeglichen, sodass auf allen Geräten derselbe Stand zu sehen ist:
 
-### Vorbereitet für Konten und Synchronisierung
+- Jedes Gerät behält eine vollständige Kopie in IndexedDB – die App funktioniert auch offline; Änderungen werden nachgeholt.
+- Abgeglichen wird nach jeder Änderung (gebündelt nach etwa 2 Sekunden), beim Start, wenn die Seite wieder sichtbar oder online wird, jede Minute und sofort, wenn ein anderes Gerät etwas ändert (Supabase Realtime).
+- Konflikte: Pro Notiz, Notizbuch, Schlagwort und Anhang gewinnt der zuletzt geänderte Stand. Der Server lässt einen älteren Stand nie einen neueren überschreiben.
+- Löschungen werden als Löschmarken übertragen und kommen so auf allen Geräten an.
+- Anhänge liegen im Supabase-Storage (Bucket `nz-attachments`, Pfad `<benutzer>/<anhang>`) und werden auf anderen Geräten erst beim Anzeigen geladen.
+- Bei der ersten Anmeldung werden Notizen, die schon auf dem Gerät sind, ins Konto übernommen. Unveränderte Beispielnotizen werden dabei weggelassen, wenn das Konto schon Notizen hat.
+- „Alle Daten löschen“ entfernt bei angemeldeten Nutzern nur die Kopie auf dem Gerät und meldet ab; das Konto bleibt unverändert.
 
-Oberfläche und Datenzugriff sind getrennt:
+### Server (Supabase)
+
+Die Daten liegen in einem Supabase-Projekt (über die Vercel-Integration), das auch von anderen Apps genutzt wird. Deshalb tragen alle Tabellen das Präfix `nz_`:
+
+| Tabelle | Inhalt |
+|---|---|
+| `nz_notes` | Notizen (HTML-Inhalt, Notizbuch, Schlagwörter, Favorit, angeheftet, Papierkorb) |
+| `nz_notebooks` | Notizbücher (mit Eltern-Notizbuch) |
+| `nz_tags` | Schlagwörter |
+| `nz_attachments` | Metadaten der Anhänge |
+
+Jede Zeile gehört über `user_id` genau einem Benutzer; Row Level Security erlaubt nur Zugriff auf eigene Zeilen, ebenso im Storage. `changed_at` (Zeitstempel des Geräts) entscheidet Konflikte, `server_updated_at` (vom Server gesetzt) dient als Abruf-Marke, `deleted` ist die Löschmarke. Die Migration liegt in `supabase/migrations/`.
+
+URL und öffentlicher Schlüssel stehen in `src/lib/sync/client.ts` und lassen sich über `NEXT_PUBLIC_SUPABASE_URL` und `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` überschreiben.
+
+### Google-Anmeldung einrichten (einmalig)
+
+1. **Google Cloud Console** → [APIs & Dienste → Anmeldedaten](https://console.cloud.google.com/apis/credentials): ggf. den OAuth-Zustimmungsbildschirm anlegen, dann *Anmeldedaten erstellen → OAuth-Client-ID → Webanwendung*.
+   - Autorisierte Weiterleitungs-URI: `https://ylbfimgvfnhlwtjxwvov.supabase.co/auth/v1/callback`
+2. **Supabase** → [Authentication → Sign In / Providers → Google](https://supabase.com/dashboard/project/ylbfimgvfnhlwtjxwvov/auth/providers): einschalten, Client-ID und Client-Secret aus Schritt 1 eintragen, speichern.
+3. **Supabase** → [Authentication → URL Configuration](https://supabase.com/dashboard/project/ylbfimgvfnhlwtjxwvov/auth/url-configuration): unter *Redirect URLs* `https://notizen-kappa.vercel.app/**` hinzufügen (für lokale Entwicklung zusätzlich `http://localhost:3000/**`). Die *Site URL* der anderen Apps bleibt unverändert.
+
+Solange Schritt 2 fehlt, zeigt die App beim Anmelden einen Hinweis statt einer Fehlerseite.
+
+### Aufbau im Code
 
 ```
-src/lib/storage/repository.ts   Schnittstelle NotesRepository
-src/lib/storage/indexeddb.ts    heutige Umsetzung mit IndexedDB
-src/lib/storage/index.ts        getRepository() / setRepository()
-src/store/notes.ts              Zustand und Aktionen der Oberfläche (Zustand)
+src/lib/storage/repository.ts   Schnittstelle NotesRepository (lokaler Speicher)
+src/lib/storage/indexeddb.ts    Umsetzung mit IndexedDB, inkl. Löschmarken und Sync-Stand
+src/lib/sync/client.ts          Supabase-Client und Zugangsdaten
+src/lib/sync/engine.ts          Abgleich (abrufen, Konflikte lösen, senden)
+src/lib/sync/index.ts           Anmeldung, Auslöser, Realtime, Status
+src/store/notes.ts              Zustand der Oberfläche; stellt dem Abgleich `syncHost` bereit
 ```
-
-Der Store greift ausschließlich über `NotesRepository` auf Daten zu. Für eine Synchronisierung wird eine weitere Umsetzung dieser Schnittstelle geschrieben (z. B. IndexedDB als Offline-Puffer plus Server-API) und per `setRepository()` eingesetzt. Alle Datensätze tragen eine eindeutige ID sowie `createdAt`/`updatedAt`, gelöschte Notizen ein `deletedAt` – die Grundlage für einen späteren Abgleich.
 
 ## Projektstruktur
 
@@ -122,7 +149,9 @@ scripts/                 Browser-Durchlauf und Testdaten
 
 ## Bekannte Einschränkungen
 
-- Keine Synchronisierung und kein Benutzerkonto: Die Daten liegen nur in diesem Browser auf diesem Gerät.
+- Synchronisierung nur mit Google-Konto; die Google-Anmeldung muss einmalig eingerichtet werden (siehe oben).
+- Bei gleichzeitiger Bearbeitung derselben Notiz auf zwei Geräten gewinnt der zuletzt gespeicherte Stand – Änderungen werden nicht zusammengeführt.
+- Kostenloser Supabase-Plan: 500 MB Datenbank und 1 GB Dateispeicher für alle Apps des Projekts zusammen; einzelne Anhänge höchstens 50 MB.
 - Beim Export als .jex gehen Favoriten und Anheften verloren (Joplin kennt beides nicht); im Markdown-ZIP stehen sie im Kopfbereich jeder Datei.
 - Verschlüsselte Joplin-Exporte werden übersprungen (vor dem Export in Joplin die Verschlüsselung deaktivieren).
 - Joplin-Besonderheiten wie Mathe-Formeln (KaTeX), Mermaid-Diagramme oder `==Markierungen==` werden als normaler Text übernommen; Erinnerungs- und Fälligkeitsdaten von Aufgaben nicht.
