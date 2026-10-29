@@ -1,6 +1,6 @@
 import TurndownService from 'turndown';
 import { tables, strikethrough } from 'turndown-plugin-gfm';
-import { attachmentIdOf, blobToDataUrl } from './attachments';
+import { NOTE_PREFIX, attachmentIdOf, blobToDataUrl } from './attachments';
 import { getRepository } from './storage';
 import type { Attachment, Id, Note } from './types';
 
@@ -23,39 +23,73 @@ function createTurndown() {
   return td;
 }
 
-const safeName = (s: string) => (s || 'Notiz').replace(/[\\/:*?"<>|\n\r]+/g, ' ').trim().slice(0, 80) || 'Notiz';
+let turndown: TurndownService | null = null;
+
+export interface LinkMapper {
+  /** Ziel für ein Bild aus dem Anhangspeicher */
+  image: (id: Id) => string;
+  /** Ziel für einen verlinkten Anhang */
+  attachment: (id: Id) => string;
+  /** Ziel für einen Link auf eine andere Notiz; `null` entfernt den Link */
+  note: (id: Id) => string | null;
+}
+
+/** Notiz-HTML in Markdown umwandeln; Anhänge und Notizlinks bestimmt `map`. */
+export function htmlToMarkdown(html: string, map: LinkMapper): string {
+  const doc = new DOMParser().parseFromString(html || '', 'text/html');
+  doc.querySelectorAll('img').forEach(img => {
+    const id = attachmentIdOf(img.getAttribute('data-src') || img.getAttribute('src'));
+    if (!id) return;
+    img.removeAttribute('data-src');
+    img.setAttribute('src', map.image(id));
+  });
+  doc.querySelectorAll('a').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    const id = attachmentIdOf(href);
+    if (id) a.setAttribute('href', map.attachment(id));
+    else if (href.startsWith(NOTE_PREFIX)) {
+      const target = map.note(href.slice(NOTE_PREFIX.length));
+      if (target) a.setAttribute('href', target);
+      else a.removeAttribute('href');
+    }
+  });
+  turndown ??= createTurndown();
+  return turndown.turndown(doc.body.innerHTML).trim();
+}
+
+export const safeFileName = (s: string) => (s || 'Ohne Titel').replace(/[\\/:*?"<>|\n\r\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Ohne Titel';
 
 /**
- * Wandelt eine Notiz in Markdown um. Bilder aus dem Anhangspeicher werden als
- * Data-URI eingebettet, damit die Datei für sich allein vollständig ist.
+ * Wandelt eine einzelne Notiz in Markdown um. Bilder werden als Data-URI
+ * eingebettet, damit die Datei für sich allein vollständig ist.
  */
 export async function noteToMarkdown(note: Note, attachments: Record<Id, Attachment>): Promise<string> {
-  const doc = new DOMParser().parseFromString(note.content || '', 'text/html');
-  for (const img of Array.from(doc.querySelectorAll('img'))) {
-    const id = attachmentIdOf(img.getAttribute('data-src') || img.getAttribute('src'));
-    if (!id) continue;
-    img.removeAttribute('data-src');
-    const blob = await getRepository().getAttachmentBlob(id);
-    if (blob && blob.size <= 8 * 1024 * 1024) img.setAttribute('src', await blobToDataUrl(blob));
-    else img.setAttribute('src', attachments[id]?.name || id);
+  const dataUrls = new Map<Id, string>();
+  for (const m of note.content.matchAll(/attachment:\/\/([0-9a-zA-Z]+)/g)) {
+    if (dataUrls.has(m[1]) || !attachments[m[1]]?.mime.startsWith('image/')) continue;
+    const blob = await getRepository().getAttachmentBlob(m[1]);
+    if (blob && blob.size <= 8 * 1024 * 1024) dataUrls.set(m[1], await blobToDataUrl(blob));
   }
-  doc.querySelectorAll('a').forEach(a => {
-    const id = attachmentIdOf(a.getAttribute('href'));
-    if (id) a.setAttribute('href', attachments[id]?.name || id);
-    else if ((a.getAttribute('href') || '').startsWith('note://')) a.removeAttribute('href');
+  const body = htmlToMarkdown(note.content, {
+    image: id => dataUrls.get(id) ?? attachments[id]?.name ?? id,
+    attachment: id => attachments[id]?.name ?? id,
+    note: () => null,
   });
-  const body = createTurndown().turndown(doc.body.innerHTML).trim();
   return `# ${note.title || 'Ohne Titel'}\n\n${body}\n`;
+}
+
+export function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export async function downloadNoteAsMarkdown(note: Note, attachments: Record<Id, Attachment>) {
   const md = await noteToMarkdown(note, attachments);
-  const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown;charset=utf-8' }));
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${safeName(note.title)}.md`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  downloadBlob(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `${safeFileName(note.title)}.md`);
 }

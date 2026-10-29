@@ -56,6 +56,7 @@ Geprüft werden unter anderem: Beispielnotizen beim ersten Start, Notiz anlegen 
 - Als Favorit markieren und oben anheften
 - Einem Notizbuch zuordnen, beliebig viele Schlagwörter vergeben (mit Vorschlägen)
 - Einzelne Notiz als Markdown-Datei exportieren (Bilder als Data-URI eingebettet)
+- Alle Notizen exportieren (Einstellungen): als **.jex** – Sicherung, die sich hier und in Joplin wieder importieren lässt – oder als **Markdown-ZIP** mit einem Ordner je Notizbuch, Anhängen in `_Anhänge/` und Titel, Notizbuch, Schlagwörtern und Datum im YAML-Kopf jeder Datei
 - Notizen per Drag & Drop auf ein Notizbuch ziehen
 
 **Editor (Tiptap)**
@@ -91,7 +92,7 @@ Geprüft werden unter anderem: Beispielnotizen beim ersten Start, Notiz anlegen 
 **Alle Daten bleiben auf dem Gerät.** Notizen, Notizbücher, Schlagwörter, Anhänge und Einstellungen liegen in der IndexedDB des Browsers (Datenbank `notizen`). Es gibt kein Benutzerkonto, nichts wird hochgeladen, und es gibt (noch) keine Synchronisierung zwischen Geräten oder Browsern.
 
 - Die Daten bleiben nach Neuladen und Neustart erhalten. Die App bittet den Browser um dauerhaften Speicher (`navigator.storage.persist()`).
-- Wer die Website-Daten der Seite löscht oder im privaten Modus arbeitet, verliert die Notizen.
+- Wer die Website-Daten der Seite löscht oder im privaten Modus arbeitet, verliert die Notizen. Deshalb regelmäßig über *Einstellungen → Notizen exportieren* eine .jex-Sicherung anlegen.
 - Anhänge werden getrennt von den Notizen als Blobs gespeichert und erst beim Anzeigen geladen.
 - Änderungen werden gebündelt nach 0,5 Sekunden gespeichert, beim Wechsel der Notiz, beim Verlassen der Seite und beim Wechsel in den Hintergrund sofort.
 
@@ -122,7 +123,7 @@ scripts/                 Browser-Durchlauf und Testdaten
 ## Bekannte Einschränkungen
 
 - Keine Synchronisierung und kein Benutzerkonto: Die Daten liegen nur in diesem Browser auf diesem Gerät.
-- Es gibt noch keine Sicherung aller Daten in eine Datei; exportieren lässt sich nur jede Notiz einzeln als Markdown.
+- Beim Export als .jex gehen Favoriten und Anheften verloren (Joplin kennt beides nicht); im Markdown-ZIP stehen sie im Kopfbereich jeder Datei.
 - Verschlüsselte Joplin-Exporte werden übersprungen (vor dem Export in Joplin die Verschlüsselung deaktivieren).
 - Joplin-Besonderheiten wie Mathe-Formeln (KaTeX), Mermaid-Diagramme oder `==Markierungen==` werden als normaler Text übernommen; Erinnerungs- und Fälligkeitsdaten von Aufgaben nicht.
 - Anhänge, die kein Bild sind (z. B. PDFs), erscheinen als Link und öffnen sich in einem neuen Tab.

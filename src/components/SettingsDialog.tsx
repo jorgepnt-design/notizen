@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileUp, HardDrive, Monitor, Moon, Sun } from 'lucide-react';
-import { deleteAllData, notify, setTheme, useNotes } from '@/store/notes';
+import { FileArchive, FileDown, FileUp, HardDrive, Loader2, Monitor, Moon, Sun } from 'lucide-react';
+import { deleteAllData, flushSaves, notify, setTheme, useNotes } from '@/store/notes';
+import { exportJex, exportMarkdownZip, type ExportResult } from '@/lib/export';
+import { downloadBlob } from '@/lib/markdown';
+import { plural } from '@/lib/format';
 import { fileSize } from '@/lib/format';
 import type { Theme } from '@/lib/types';
 import { Modal } from './ui/Modal';
@@ -26,6 +29,24 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
     navigator.storage?.estimate?.().then(e => setUsage({ used: e.usage ?? 0, quota: e.quota ?? 0 })).catch(() => undefined);
     navigator.storage?.persisted?.().then(setPersisted).catch(() => undefined);
   }, []);
+
+  const [exporting, setExporting] = useState<string | null>(null);
+  const runExport = async (kind: 'jex' | 'md') => {
+    setExporting('Export wird vorbereitet …');
+    try {
+      await flushSaves();
+      const s = useNotes.getState();
+      const data = { notes: Object.values(s.notes), notebooks: s.notebooks, tags: s.tags, attachments: s.attachments };
+      const res: ExportResult = kind === 'jex' ? await exportJex(data, setExporting) : await exportMarkdownZip(data, setExporting);
+      downloadBlob(res.blob, res.fileName);
+      notify(`Exportiert: ${plural(res.notes, 'Notiz', 'Notizen')}, ${plural(res.attachments, 'Anhang', 'Anhänge')} (${fileSize(res.blob.size)}).`);
+    } catch (e) {
+      console.error(e);
+      notify('Der Export ist fehlgeschlagen. Bitte noch einmal versuchen.', 'error');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const wipe = async () => {
     const ok = await confirmDialog({
@@ -101,6 +122,36 @@ export function SettingsDialog({ onClose, onImport }: { onClose: () => void; onI
           >
             <FileUp size={16} /> .jex-Datei importieren
           </button>
+        </section>
+
+        <section aria-labelledby="set-export">
+          <h3 id="set-export" className="mb-1 font-semibold">
+            Notizen exportieren
+          </h3>
+          <p className="mb-3 leading-relaxed text-muted">
+            Lädt alle Notizen mit Notizbüchern, Schlagwörtern und Anhängen als Datei herunter. Notizen im Papierkorb sind nicht enthalten. Exportiere
+            regelmäßig, denn die Daten liegen sonst nur in diesem Browser.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button className="btn-secondary h-auto flex-col items-start gap-0.5 py-3 text-left" onClick={() => runExport('jex')} disabled={!!exporting}>
+              <span className="flex items-center gap-2 font-semibold">
+                <FileDown size={16} /> Als .jex (Sicherung)
+              </span>
+              <span className="text-xs font-normal text-muted">Lässt sich hier und in Joplin wieder importieren</span>
+            </button>
+            <button className="btn-secondary h-auto flex-col items-start gap-0.5 py-3 text-left" onClick={() => runExport('md')} disabled={!!exporting}>
+              <span className="flex items-center gap-2 font-semibold">
+                <FileArchive size={16} /> Als Markdown (ZIP)
+              </span>
+              <span className="text-xs font-normal text-muted">Ein Ordner je Notizbuch, lesbar in jedem Editor</span>
+            </button>
+          </div>
+          {exporting && (
+            <p className="mt-2 flex items-center gap-2 text-muted" role="status">
+              <Loader2 size={15} className="animate-spin text-accent" /> {exporting}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-muted">Einzelne Notizen exportierst du im Editor über das Menü ⋯ → „Als Markdown exportieren“.</p>
         </section>
 
         <section aria-labelledby="set-keys">

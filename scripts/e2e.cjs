@@ -153,6 +153,23 @@ const log = (...a) => console.log('✔', ...a);
   await page.waitForTimeout(300);
   await expect(list.locator('[data-note]').count().then(n => n === countBefore), 'Erneuter Import erzeugt keine Duplikate');
 
+  // Export aller Notizen
+  await page.locator('nav').getByRole('button', { name: 'Einstellungen', exact: true }).click();
+  for (const [btn, ext] of [['Als .jex (Sicherung)', '.jex'], ['Als Markdown (ZIP)', '.zip']]) {
+    const dlp = page.waitForEvent('download');
+    await page.getByRole('button', { name: btn }).click();
+    const d = await dlp;
+    const buf = Buffer.concat(await (await d.createReadStream()).toArray());
+    await expect(Promise.resolve(d.suggestedFilename().endsWith(ext) && buf.length > 1000), `Export ${btn}: ${d.suggestedFilename()} (${buf.length} Bytes)`);
+    if (ext === '.zip') await expect(Promise.resolve(buf.includes(Buffer.from('Reisen/Portugal/Packliste Lissabon.md')) && buf.includes(Buffer.from('_Anh'))), 'ZIP enthält Notizbuch-Ordner und Anhänge');
+    if (ext === '.jex') {
+      require('fs').writeFileSync(shots + '/export.jex', buf);
+    }
+  }
+  await page.getByRole('button', { name: 'Fertig' }).click();
+  await expect(page.locator('nav').getByText('by Jorge').isVisible(), 'App-Name „Notizen by Jorge“ oben links');
+  await expect(page.title().then(t => t === 'Notizen by Jorge'), 'Seitentitel „Notizen by Jorge“');
+
   // Dark Mode
   await page.locator('nav').getByRole('button', { name: 'Einstellungen', exact: true }).click();
   await page.getByRole('radio', { name: 'Dunkel' }).click();
@@ -162,6 +179,18 @@ const log = (...a) => console.log('✔', ...a);
   await page.screenshot({ path: shots + '/4-dark.png' });
   await page.reload();
   await expect(page.evaluate(() => document.documentElement.classList.contains('dark')), 'Dark Mode bleibt nach Neuladen');
+
+  // Eigene .jex-Sicherung in einem frischen Browser wieder einlesen
+  const fresh = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-DE' });
+  const p4 = await fresh.newPage();
+  await p4.goto(URL);
+  await p4.getByText('Willkommen bei Notizen 👋').first().waitFor();
+  await p4.locator('input[type=file]').last().setInputFiles(shots + '/export.jex');
+  await p4.getByText('Import abgeschlossen').waitFor({ timeout: 15000 });
+  await p4.locator('#main-list').getByText('Packliste Lissabon').click();
+  await p4.waitForFunction(() => [...document.querySelectorAll('.note-content img')].some(i => i.naturalWidth > 0));
+  await expect(p4.locator('#main-list').getByText('Testnotiz Zitronenkuchen', { exact: true }).count().then(n => n === 1), 'Eigene .jex-Sicherung in neuem Browser eingelesen, Bild sichtbar');
+  await fresh.close();
 
   // Smartphone
   const phone = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, locale: 'de-DE' });
