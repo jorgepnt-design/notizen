@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileUp, Loader2 } from 'lucide-react';
 import { createNote, flushSaves, hasUnsavedChanges, importJoplin, init, notify, syncHost, useNotes } from '@/store/notes';
-import { initSync } from '@/lib/sync';
+import { initSync, syncNow, useSync } from '@/lib/sync';
+import { useNavHistory } from './useNavHistory';
 import { plural } from '@/lib/format';
 import { Sidebar } from './Sidebar';
 import { NoteList } from './NoteList';
@@ -26,6 +27,15 @@ export default function NotesApp() {
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const nav = useNavHistory(mobilePane, setMobilePane);
+
+  /** Aktualisieren: alles speichern, (angemeldet) abgleichen, dann die Seite neu laden */
+  const refresh = useCallback(async () => {
+    notify('Wird aktualisiert …');
+    await flushSaves();
+    if (useSync.getState().user) await syncNow().catch(() => undefined);
+    location.reload();
+  }, []);
 
   useEffect(() => {
     void init().then(() => {
@@ -193,11 +203,11 @@ export default function NotesApp() {
       )}
 
       <div id="main-list" className={`w-full shrink-0 border-r border-line md:block md:w-[320px] xl:w-[360px] ${mobilePane === 'list' ? 'block' : 'hidden'}`}>
-        <NoteList onOpenNav={() => setDrawer(true)} onOpened={() => setMobilePane('editor')} onNewNote={newNote} onImport={() => fileInput.current?.click()} />
+        <NoteList onBack={nav.canGoBack ? nav.back : undefined} onRefresh={refresh} onOpenNav={() => setDrawer(true)} onOpened={() => setMobilePane('editor')} onNewNote={newNote} onImport={() => fileInput.current?.click()} />
       </div>
 
       <main className={`min-w-0 flex-1 md:block ${mobilePane === 'editor' ? 'block' : 'hidden'}`}>
-        <NoteEditorPane onBack={() => setMobilePane('list')} />
+        <NoteEditorPane onBack={() => (nav.canGoBack ? nav.back() : setMobilePane('list'))} />
       </main>
 
       <input

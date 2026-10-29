@@ -8,6 +8,10 @@ import {
   BookOpen,
   Check,
   Copy,
+  MessageCircle,
+  Redo2,
+  Share2,
+  Undo2,
   Download,
   Loader2,
   MoreHorizontal,
@@ -36,6 +40,7 @@ import {
 } from '@/store/notes';
 import { ATTACHMENT_PREFIX, NOTE_PREFIX, attachmentIdOf, attachmentUrl } from '@/lib/attachments';
 import { downloadNoteAsMarkdown } from '@/lib/markdown';
+import { canShareNatively, shareNatively, shareViaWhatsApp } from '@/lib/share';
 import { notebookPath } from '@/lib/query';
 import { longDate } from '@/lib/format';
 import { escapeHtml } from '@/lib/html';
@@ -246,6 +251,30 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
         <span className="flex-1" />
         {!inTrash && (
           <>
+            {editor && (
+              <>
+                <button
+                  className="icon-btn"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => editor.chain().focus().undo().run()}
+                  disabled={!editor.can().undo()}
+                  aria-label="Rückgängig"
+                  title="Rückgängig (Strg+Z)"
+                >
+                  <Undo2 size={18} />
+                </button>
+                <button
+                  className="icon-btn"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => editor.chain().focus().redo().run()}
+                  disabled={!editor.can().redo()}
+                  aria-label="Wiederholen"
+                  title="Wiederholen (Strg+Umschalt+Z)"
+                >
+                  <Redo2 size={18} />
+                </button>
+              </>
+            )}
             <button
               className={`icon-btn ${note.favorite ? 'text-star hover:text-star' : ''}`}
               onClick={() => toggleFavorite(note.id)}
@@ -256,7 +285,7 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
               <Star size={18} className={note.favorite ? 'fill-current' : ''} />
             </button>
             <button
-              className={`icon-btn ${note.pinned ? 'text-accent hover:text-accent' : ''}`}
+              className={`icon-btn hidden sm:inline-flex ${note.pinned ? 'text-accent hover:text-accent' : ''}`}
               onClick={() => togglePinned(note.id)}
               aria-pressed={note.pinned}
               aria-label={note.pinned ? 'Nicht mehr anheften' : 'Oben anheften'}
@@ -268,6 +297,9 @@ function NoteEditor({ note, onBack }: { note: Note; onBack: () => void }) {
               label="Weitere Aktionen"
               trigger={<MoreHorizontal size={18} />}
               items={[
+                { label: 'Per WhatsApp teilen', icon: <MessageCircle size={15} />, onSelect: () => { flushContent(); shareViaWhatsApp(useNotes.getState().notes[note.id]); } },
+                canShareNatively() && { label: 'Teilen …', icon: <Share2 size={15} />, onSelect: () => { flushContent(); void shareNatively(useNotes.getState().notes[note.id]); } },
+                { label: note.pinned ? 'Nicht mehr anheften' : 'Oben anheften', icon: <Pin size={15} />, onSelect: () => togglePinned(note.id) },
                 { label: 'Duplizieren', icon: <Copy size={15} />, onSelect: () => { flushContent(); duplicateNote(note.id); } },
                 { label: 'Als Markdown exportieren', icon: <Download size={15} />, onSelect: exportMd },
                 { label: 'In den Papierkorb', icon: <Trash2 size={15} />, danger: true, onSelect: () => { flushContent(); trashNote(note.id); } },

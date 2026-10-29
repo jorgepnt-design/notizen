@@ -181,6 +181,60 @@ const log = (...a) => console.log('✔', ...a);
   await page.reload();
   await expect(page.evaluate(() => document.documentElement.classList.contains('dark')), 'Dark Mode bleibt nach Neuladen');
 
+  // Rückgängig in der Notiz
+  await page.locator('nav').getByRole('button', { name: 'Neue Notiz' }).click();
+  await page.waitForFunction(() => document.activeElement?.id === 'note-title');
+  await page.keyboard.type('Undo-Test');
+  await page.keyboard.press('Enter');
+  await page.keyboard.type('Hallo');
+  await page.waitForTimeout(600);
+  await page.keyboard.type(' Welt');
+  await page.getByRole('button', { name: 'Rückgängig', exact: true }).click();
+  await expect(page.locator('.note-content').innerText().then(t => !t.includes('Welt')), 'Rückgängig-Knopf in der Kopfzeile nimmt Eingabe zurück');
+
+  // Teilen per WhatsApp (wa.me wird abgefangen, damit der Test ohne Internet läuft)
+  await page.context().route(/wa\.me|whatsapp/, route => route.fulfill({ status: 200, body: 'WhatsApp' }));
+  const popupP = page.waitForEvent('popup');
+  await page.getByRole('button', { name: 'Weitere Aktionen' }).click();
+  await page.getByRole('menuitem', { name: 'Per WhatsApp teilen' }).click();
+  const popup = await popupP;
+  const waUrl = popup.url();
+  await popup.close();
+  await expect(Promise.resolve(/wa\.me|whatsapp/.test(waUrl) && decodeURIComponent(waUrl).includes('*Undo-Test*')), 'Per WhatsApp teilen öffnet WhatsApp mit dem Notiztext');
+
+  // Zurück zur vorherigen Seite
+  await page.locator('nav').getByRole('button', { name: 'Favoriten', exact: true }).click();
+  await page.locator('nav').getByRole('button', { name: 'Alle Notizen', exact: true }).click();
+  await page.getByRole('button', { name: 'Zurück zur vorherigen Seite' }).click();
+  await expect(page.getByRole('heading', { name: 'Favoriten', level: 1 }).isVisible(), 'Zurück-Knopf führt zur vorherigen Ansicht (Favoriten)');
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Alle Notizen', level: 1 }).isVisible(), 'Browser-Zurück funktioniert ebenfalls (davor: Alle Notizen)');
+
+  // Mehrfachauswahl: kopieren und verschieben
+  await page.locator('nav').getByRole('button', { name: 'Alle Notizen', exact: true }).click();
+  await page.getByRole('button', { name: 'Auswählen' }).click();
+  await list.getByText('Wochenplan', { exact: true }).click();
+  await list.getByText('Ideen für den Urlaub', { exact: true }).click();
+  await expect(page.getByText('2 ausgewählt').isVisible(), 'Zwei Notizen ausgewählt');
+  await page.getByRole('toolbar', { name: 'Aktionen für die Auswahl' }).getByRole('button', { name: 'Kopieren' }).click();
+  await page.getByRole('dialog').getByText('Reisen › Portugal').click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Kopieren' }).click();
+  await page.locator('nav').getByRole('button', { name: 'Portugal', exact: true }).click();
+  await expect(list.locator('[data-note]').count().then(n => n === 3), 'Mehrfachauswahl: 2 Notizen nach „Portugal“ kopiert');
+  await page.getByRole('button', { name: 'Auswählen' }).click();
+  await list.getByText('Packliste Lissabon', { exact: true }).click();
+  await page.getByRole('toolbar', { name: 'Aktionen für die Auswahl' }).getByRole('button', { name: 'Verschieben' }).click();
+  await page.getByRole('dialog').getByText('Arbeit', { exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Verschieben' }).click();
+  await page.locator('nav').getByRole('button', { name: 'Arbeit', exact: true }).click();
+  await expect(list.getByText('Packliste Lissabon').count().then(n => n === 1), 'Mehrfachauswahl: Notiz nach „Arbeit“ verschoben');
+
+  // Aktualisieren
+  await page.getByRole('button', { name: 'Aktualisieren' }).click();
+  await page.waitForEvent('load');
+  await page.getByText('Packliste Lissabon').first().waitFor();
+  log('Aktualisieren lädt die App neu, Daten bleiben erhalten');
+
   // Eigene .jex-Sicherung in einem frischen Browser wieder einlesen
   const fresh = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'de-DE' });
   const p4 = await fresh.newPage();
@@ -208,6 +262,33 @@ const log = (...a) => console.log('✔', ...a);
   await p2.screenshot({ path: shots + '/7-phone-nav.png' });
   await p2.getByRole('button', { name: 'Favoriten' }).click();
   await expect(p2.getByRole('heading', { name: 'Favoriten' }).isVisible(), 'Mobile Navigation: Schublade → Favoriten');
+
+  // Wischen nach links zum Löschen (Touch über CDP)
+  await p2.getByRole('button', { name: 'Navigation öffnen' }).click();
+  await p2.getByRole('button', { name: 'Alle Notizen' }).click();
+  const cdp = await p2.context().newCDPSession(p2);
+  const swipe = async (text, from, to) => {
+    const box = await p2.locator('[data-note]', { hasText: text }).boundingBox();
+    const y = box.y + box.height / 2;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: from, y }] });
+    for (let i = 1; i <= 8; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: from + ((to - from) * i) / 8, y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  await swipe('Wochenplan', 300, 200);
+  await p2.waitForTimeout(300);
+  await p2.screenshot({ path: shots + '/9-phone-swipe.png' });
+  await p2.locator('li', { hasText: 'Wochenplan' }).getByRole('button', { name: 'Löschen' }).click();
+  await expect(p2.getByRole('dialog').getByText('„Wochenplan“ löschen?').isVisible(), 'Wischen nach links: Rückfrage vor dem Löschen');
+  await p2.getByRole('dialog').getByRole('button', { name: 'Löschen' }).click();
+  await expect(p2.locator('#main-list').getByText('Wochenplan', { exact: true }).count().then(n => n === 0), 'Nach Bestätigung im Papierkorb');
+
+  // Langes Drücken startet die Auswahl
+  const box = await p2.locator('[data-note]', { hasText: 'Tastenkürzel' }).boundingBox();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + 40, y: box.y + 20 }] });
+  await p2.waitForTimeout(700);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect(p2.getByText('1 ausgewählt').isVisible(), 'Langes Drücken startet die Mehrfachauswahl');
+  await p2.screenshot({ path: shots + '/10-phone-select.png' });
 
   // Tablet
   const tab = await browser.newContext({ viewport: { width: 900, height: 1180 }, locale: 'de-DE' });

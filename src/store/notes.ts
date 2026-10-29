@@ -322,6 +322,38 @@ export function duplicateNote(id: Id) {
   notify('Notiz dupliziert.');
 }
 
+/** Mehrere Notizen in ein Notizbuch verschieben (`null` = Unsortiert) */
+export function moveNotes(ids: Id[], notebookId: Id | null) {
+  const { notes } = get();
+  const now = Date.now();
+  putNotes(ids.map(id => notes[id]).filter(Boolean).map(n => ({ ...n, notebookId, deletedAt: null, updatedAt: now })), true);
+}
+
+/** Kopien mehrerer Notizen in einem Notizbuch anlegen; liefert die neuen IDs */
+export function copyNotes(ids: Id[], notebookId: Id | null): Id[] {
+  const { notes } = get();
+  const now = Date.now();
+  const copies = ids
+    .map(id => notes[id])
+    .filter(Boolean)
+    .map(n => ({ ...n, id: newId(), notebookId, pinned: false, deletedAt: null, createdAt: now, updatedAt: now }));
+  putNotes(copies, true);
+  return copies.map(c => c.id);
+}
+
+/** Mehrere Notizen in den Papierkorb (mit „Rückgängig“) */
+export function trashNotes(ids: Id[]) {
+  const { notes } = get();
+  const now = Date.now();
+  putNotes(ids.map(id => notes[id]).filter(Boolean).map(n => ({ ...n, deletedAt: now, pinned: false })), true);
+  notify(ids.length === 1 ? 'Notiz in den Papierkorb verschoben.' : `${ids.length} Notizen in den Papierkorb verschoben.`, 'info', {
+    label: 'Rückgängig',
+    run: () => ids.forEach(restoreNote),
+  });
+}
+
+export const deleteNotesForever = (ids: Id[]) => purgeNotes(ids);
+
 export function trashNote(id: Id) {
   patchNote(id, { deletedAt: Date.now(), pinned: false }, false);
   notify('Notiz in den Papierkorb verschoben.', 'info', { label: 'Rückgängig', run: () => restoreNote(id) });

@@ -58,11 +58,17 @@ Geprüft werden unter anderem: Beispielnotizen beim ersten Start, Notiz anlegen 
 - Einzelne Notiz als Markdown-Datei exportieren (Bilder als Data-URI eingebettet)
 - Alle Notizen exportieren (Einstellungen): als **.jex** – Sicherung, die sich hier und in Joplin wieder importieren lässt – oder als **Markdown-ZIP** mit einem Ordner je Notizbuch, Anhängen in `_Anhänge/` und Titel, Notizbuch, Schlagwörtern und Datum im YAML-Kopf jeder Datei
 - Notizen per Drag & Drop auf ein Notizbuch ziehen
+- **Mehrfachauswahl** („Auswählen“ oder auf dem Handy lange auf eine Notiz drücken): mehrere Notizen auf einmal in ein Notizbuch verschieben, kopieren oder löschen; im Papierkorb wiederherstellen oder endgültig löschen
+- **Wischen nach links** auf dem Handy: Löschen-Knopf erscheint, vor dem Löschen kommt eine Rückfrage (ganz durchwischen fragt sofort)
+- **Teilen**: Notiz per WhatsApp teilen (mit WhatsApp-Formatierung: *fett*, _kursiv_, Listen, ☐/☑-Checklisten) oder über das Teilen-Menü des Geräts
+- **Zurück-Knopf** zur vorherigen Ansicht; die Zurück-Taste/Wischgeste des Geräts funktioniert ebenso
+- **Aktualisieren-Knopf** über der Notizenliste: speichert, gleicht ab (falls angemeldet) und lädt die App neu
 
 **Editor (Tiptap)**
 - Überschriften, fett, kursiv, durchgestrichen, Code, Aufzählungen, nummerierte Listen, Checklisten, Links, Zitate, Codeblöcke, Tabellen (aus Importen)
 - Markdown-Kürzel beim Tippen (`## `, `- `, `[ ] `, `> `, ` ``` `)
 - Bilder und Dateien per Büroklammer, Einfügen oder Hineinziehen anhängen
+- „Rückgängig“ und „Wiederholen“ immer sichtbar in der Kopfzeile der Notiz
 - Automatisches Speichern mit sichtbarem Status („Speichert …“, „Gespeichert“, „Nicht gespeichert – Erneut versuchen“)
 
 **Notizbücher und Schlagwörter**

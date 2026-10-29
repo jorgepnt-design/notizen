@@ -15,10 +15,8 @@ import {
   ListOrdered,
   Paperclip,
   Quote,
-  Redo2,
   SquareCode,
   Strikethrough,
-  Undo2,
 } from 'lucide-react';
 import { promptDialog } from '../ui/dialogs';
 
@@ -108,13 +106,6 @@ export function Toolbar({ editor, onAttach }: Props) {
           e.target.value = '';
         }}
       />
-      <Sep />
-      <Btn label="Rückgängig (Strg+Z)" disabled={!editor.can().undo()} onClick={() => chain().undo().run()}>
-        <Undo2 size={17} />
-      </Btn>
-      <Btn label="Wiederholen (Strg+Umschalt+Z)" disabled={!editor.can().redo()} onClick={() => chain().redo().run()}>
-        <Redo2 size={17} />
-      </Btn>
     </div>
   );
 }
