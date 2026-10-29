@@ -1,9 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#0f7a4a"/>
-  <path d="M150 110h160l72 72v220a20 20 0 0 1-20 20H150a20 20 0 0 1-20-20V130a20 20 0 0 1 20-20z" fill="#ffffff"/>
-  <path d="M310 110v52a20 20 0 0 0 20 20h52z" fill="#bfe8d2"/>
-  <rect x="172" y="236" width="168" height="18" rx="9" fill="#0f7a4a"/>
-  <rect x="172" y="282" width="168" height="18" rx="9" fill="#9ad3b4"/>
-  <rect x="172" y="328" width="112" height="18" rx="9" fill="#9ad3b4"/>
-  <rect x="172" y="168" width="96" height="30" rx="8" fill="#0f7a4a"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b6ff3b"/>
+      <stop offset="0.45" stop-color="#18d26e"/>
+      <stop offset="1" stop-color="#0a8f8a"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.25" cy="0.2" r="0.7">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0fa968"/>
+      <stop offset="1" stop-color="#0a8f8a"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#04403a" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- Notizblatt -->
+  <g transform="rotate(-9 256 270)" filter="url(#shadow)">
+    <path d="M150 112h170l70 70v222a26 26 0 0 1-26 26H150a26 26 0 0 1-26-26V138a26 26 0 0 1 26-26z" fill="#ffffff"/>
+    <path d="M320 112v46a24 24 0 0 0 24 24h46z" fill="#d7f7e6"/>
+    <rect x="160" y="170" width="120" height="30" rx="15" fill="url(#ink)"/>
+    <rect x="160" y="236" width="190" height="18" rx="9" fill="#bfeeda"/>
+    <rect x="160" y="280" width="190" height="18" rx="9" fill="#bfeeda"/>
+    <rect x="160" y="324" width="120" height="18" rx="9" fill="#bfeeda"/>
+  </g>
+  <!-- Häkchen-Badge -->
+  <circle cx="372" cy="384" r="62" fill="#ff3d7f" stroke="#ffffff" stroke-width="12"/>
+  <path d="M342 386l21 21 41-44" fill="none" stroke="#ffffff" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Funkeln -->
+  <path d="M404 78l9 27 27 9-27 9-9 27-9-27-27-9 27-9z" fill="#ffffff"/>
+  <path d="M88 380l6 17 17 6-17 6-6 17-6-17-17-6 17-6z" fill="#ffffff" opacity="0.9"/>
+  <circle cx="450" cy="186" r="8" fill="#ffffff" opacity="0.85"/>
 </svg>
