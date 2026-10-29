@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 const NotesApp = dynamic(() => import('@/components/NotesApp'), {
   ssr: false,
   loading: () => (
-    <div className="flex h-dvh items-center justify-center text-sm text-muted" role="status" data-loading>
+    <div className="app-height flex items-center justify-center text-sm text-muted" role="status" data-loading>
       Notizen werden geladen …
     </div>
   ),

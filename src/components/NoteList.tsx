@@ -248,7 +248,7 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
   );
 
   return (
-    <section className="flex h-full min-w-0 flex-col bg-surface" aria-label="Notizenliste">
+    <section className="flex h-full min-h-0 min-w-0 flex-col bg-surface" aria-label="Notizenliste">
       <header className="space-y-3 border-b border-line px-4 pb-3 pt-4">
         {/* Auf Handy/Tablet ist die Seitenleiste eingeklappt – App-Name daher hier zeigen */}
         <div className="flex items-center gap-2 lg:hidden">
@@ -384,7 +384,7 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
         </div>
       )}
 
-      <ul ref={listRef} className="flex-1 overflow-y-auto" onKeyDown={onKeyDown} aria-label={`${title}: Notizen`}>
+      <ul ref={listRef} className={`min-h-0 flex-1 overflow-y-auto ${selecting ? 'pb-24 md:pb-0' : ''}`} onKeyDown={onKeyDown} aria-label={`${title}: Notizen`}>
         {notes.slice(0, limit).map(n => (
           <NoteRow
             key={n.id}
@@ -418,19 +418,24 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
         )}
       </ul>
 
-      {selecting && picked.size > 0 && (
-        <div className="grid grid-cols-3 gap-1 border-t border-line bg-surface p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]" role="toolbar" aria-label="Aktionen für die Auswahl">
+      {selecting && (
+        // Auf dem Handy fest am unteren Bildschirmrand, damit die Leiste immer sichtbar ist
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 gap-1 border-t border-line bg-surface p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-4px_16px_rgba(0,0,0,0.08)] md:static md:shadow-none"
+          role="toolbar"
+          aria-label="Aktionen für die Auswahl"
+        >
           {inTrash ? (
             <>
-              <BarButton icon={<RotateCcw size={18} />} label="Wiederherstellen" onClick={bulkRestore} />
+              <BarButton icon={<RotateCcw size={18} />} label="Wiederherstellen" onClick={bulkRestore} disabled={!picked.size} />
               <span />
-              <BarButton icon={<Trash2 size={18} />} label="Endgültig löschen" onClick={bulkDelete} danger />
+              <BarButton icon={<Trash2 size={18} />} label="Endgültig löschen" onClick={bulkDelete} disabled={!picked.size} danger />
             </>
           ) : (
             <>
-              <BarButton icon={<FolderInput size={18} />} label="Verschieben" onClick={bulkMove} />
-              <BarButton icon={<Copy size={18} />} label="Kopieren" onClick={bulkCopy} />
-              <BarButton icon={<Trash2 size={18} />} label="Löschen" onClick={bulkDelete} danger />
+              <BarButton icon={<FolderInput size={18} />} label="Verschieben" onClick={bulkMove} disabled={!picked.size} />
+              <BarButton icon={<Copy size={18} />} label="Kopieren" onClick={bulkCopy} disabled={!picked.size} />
+              <BarButton icon={<Trash2 size={18} />} label="Löschen" onClick={bulkDelete} disabled={!picked.size} danger />
             </>
           )}
         </div>
@@ -439,9 +444,13 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
   );
 }
 
-function BarButton({ icon, label, onClick, danger }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean }) {
+function BarButton({ icon, label, onClick, danger, disabled }: { icon: React.ReactNode; label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
   return (
-    <button className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-medium hover:bg-sunken ${danger ? 'text-danger' : 'text-ink'}`} onClick={onClick}>
+    <button
+      className={`flex flex-col items-center gap-0.5 rounded-lg py-1.5 text-[11px] font-medium hover:bg-sunken disabled:opacity-40 ${danger ? 'text-danger' : 'text-ink'}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
       {icon}
       {label}
     </button>

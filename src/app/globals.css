@@ -44,6 +44,13 @@ body {
   height: 100%;
 }
 
+/* Volle Bildschirmhöhe – dvh berücksichtigt die ein- und ausblendende Leiste von Safari,
+   vh ist der Rückfall für ältere iOS-Versionen */
+.app-height {
+  height: 100vh;
+  height: 100dvh;
+}
+
 body {
   @apply bg-canvas text-ink antialiased;
   font-feature-settings: 'cv11', 'ss01';

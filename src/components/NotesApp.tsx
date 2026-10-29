@@ -131,7 +131,7 @@ export default function NotesApp() {
 
   if (!ready) {
     return (
-      <div className="flex h-dvh items-center justify-center text-sm text-muted" role="status" data-loading>
+      <div className="app-height flex items-center justify-center text-sm text-muted" role="status" data-loading>
         Notizen werden geladen …
       </div>
     );
@@ -139,7 +139,7 @@ export default function NotesApp() {
 
   if (loadError) {
     return (
-      <div className="flex h-dvh items-center justify-center p-6">
+      <div className="app-height flex items-center justify-center p-6">
         <div className="max-w-md rounded-2xl border border-line bg-surface p-6 text-center shadow-sm" role="alert">
           <h1 className="text-lg font-semibold">Notizen können nicht geladen werden</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">{loadError}</p>
@@ -168,7 +168,7 @@ export default function NotesApp() {
 
   return (
     <div
-      className="flex h-dvh overflow-hidden"
+      className="app-height flex overflow-hidden"
       onDragOver={e => {
         if (Array.from(e.dataTransfer.types).includes('Files') && !(e.target as HTMLElement).closest('.note-content')) {
           e.preventDefault();
@@ -202,11 +202,11 @@ export default function NotesApp() {
         </div>
       )}
 
-      <div id="main-list" className={`w-full shrink-0 border-r border-line md:block md:w-[320px] xl:w-[360px] ${mobilePane === 'list' ? 'block' : 'hidden'}`}>
+      <div id="main-list" className={`h-full min-h-0 w-full shrink-0 border-r border-line md:block md:w-[320px] xl:w-[360px] ${mobilePane === 'list' ? 'block' : 'hidden'}`}>
         <NoteList onBack={nav.canGoBack ? nav.back : undefined} onRefresh={refresh} onOpenNav={() => setDrawer(true)} onOpened={() => setMobilePane('editor')} onNewNote={newNote} onImport={() => fileInput.current?.click()} />
       </div>
 
-      <main className={`min-w-0 flex-1 md:block ${mobilePane === 'editor' ? 'block' : 'hidden'}`}>
+      <main className={`h-full min-h-0 min-w-0 flex-1 md:block ${mobilePane === 'editor' ? 'block' : 'hidden'}`}>
         <NoteEditorPane onBack={() => (nav.canGoBack ? nav.back() : setMobilePane('list'))} />
       </main>
 
