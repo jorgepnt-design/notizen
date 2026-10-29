@@ -1,0 +1,183 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Farbwerte als RGB-Tripel, damit Tailwind Transparenz (bg-accent/10) berechnen kann. */
+:root {
+  --canvas: 247 248 246;
+  --surface: 255 255 255;
+  --sunken: 240 243 239;
+  --line: 224 229 223;
+  --ink: 27 33 30;
+  --muted: 86 97 91;
+  --faint: 122 133 126;
+  --accent: 15 122 74;
+  --accent-strong: 10 94 56;
+  --accent-soft: 226 243 233;
+  --on-accent: 255 255 255;
+  --danger: 185 38 38;
+  --danger-soft: 252 233 233;
+  --star: 196 132 0;
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: 17 21 19;
+  --surface: 24 29 26;
+  --sunken: 31 37 34;
+  --line: 45 53 48;
+  --ink: 229 235 231;
+  --muted: 163 174 168;
+  --faint: 125 136 130;
+  --accent: 80 200 138;
+  --accent-strong: 120 218 166;
+  --accent-soft: 27 54 40;
+  --on-accent: 8 28 18;
+  --danger: 242 115 115;
+  --danger-soft: 62 28 28;
+  --star: 240 190 70;
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+/* Deutlich sichtbarer Tastaturfokus überall */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-on-accent hover:bg-accent-strong;
+  }
+  .btn-secondary {
+    @apply btn border border-line bg-surface text-ink hover:bg-sunken;
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-sunken hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn bg-danger text-white hover:opacity-90 dark:text-canvas;
+  }
+  .icon-btn {
+    @apply inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-sunken hover:text-ink disabled:opacity-40;
+  }
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25;
+  }
+}
+
+/* ---------- Editor (ProseMirror / Tiptap) ---------- */
+.note-content {
+  @apply text-[16px] leading-7 text-ink;
+  outline: none;
+  min-height: 50vh;
+}
+.note-content:focus-visible {
+  outline: none;
+}
+.note-content > * + * {
+  margin-top: 0.75em;
+}
+.note-content h1 {
+  @apply mt-8 text-2xl font-semibold leading-tight tracking-tight;
+}
+.note-content h2 {
+  @apply mt-7 text-xl font-semibold leading-snug;
+}
+.note-content h3 {
+  @apply mt-6 text-lg font-semibold;
+}
+.note-content h1:first-child,
+.note-content h2:first-child,
+.note-content h3:first-child {
+  margin-top: 0;
+}
+.note-content a {
+  @apply text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent;
+}
+.note-content a[href^='attachment:'] {
+  @apply inline-flex items-center gap-1 rounded-md border border-line bg-sunken px-2 py-0.5 text-sm no-underline;
+}
+.note-content a[href^='attachment:']::before {
+  content: '📎';
+}
+.note-content ul {
+  @apply list-disc pl-6;
+}
+.note-content ol {
+  @apply list-decimal pl-6;
+}
+.note-content li > p {
+  margin: 0;
+}
+.note-content li + li {
+  margin-top: 0.2em;
+}
+.note-content blockquote {
+  @apply border-l-4 border-accent/50 pl-4 italic text-muted;
+}
+.note-content code {
+  @apply rounded bg-sunken px-1.5 py-0.5 font-mono text-[0.88em];
+}
+.note-content pre {
+  @apply overflow-x-auto rounded-lg border border-line bg-sunken p-4 font-mono text-sm leading-6;
+}
+.note-content pre code {
+  @apply bg-transparent p-0;
+}
+.note-content hr {
+  @apply my-6 border-line;
+}
+.note-content img {
+  @apply my-2 max-w-full rounded-lg;
+  height: auto;
+}
+.note-content img.ProseMirror-selectednode {
+  outline: 3px solid rgb(var(--accent));
+}
+.note-content table {
+  @apply w-full border-collapse text-sm;
+}
+.note-content th,
+.note-content td {
+  @apply border border-line px-3 py-1.5 text-left align-top;
+}
+.note-content th {
+  @apply bg-sunken font-semibold;
+}
+.note-content ul[data-type='taskList'] {
+  @apply list-none pl-1;
+}
+.note-content ul[data-type='taskList'] li {
+  @apply flex items-start gap-2;
+}
+.note-content ul[data-type='taskList'] li > label {
+  @apply mt-[5px] flex shrink-0 select-none;
+}
+.note-content ul[data-type='taskList'] li > label input {
+  @apply h-4 w-4 cursor-pointer accent-[rgb(var(--accent))];
+}
+.note-content ul[data-type='taskList'] li > div {
+  @apply min-w-0 flex-1;
+}
+.note-content ul[data-type='taskList'] li[data-checked='true'] > div {
+  @apply text-muted line-through;
+}
+.note-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  @apply pointer-events-none float-left h-0 text-faint;
+}
