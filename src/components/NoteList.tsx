@@ -8,7 +8,7 @@ import { previewText } from '@/lib/html';
 import { plural, shortDate } from '@/lib/format';
 import type { Id, Note, SortKey } from '@/lib/types';
 import { confirmDialog } from './ui/dialogs';
-import { DND_NOTE } from './Sidebar';
+import { BrandMark, DND_NOTE } from './Sidebar';
 
 const STEP = 100;
 const SORT_LABEL: Record<SortKey, string> = { updated: 'Zuletzt geändert', created: 'Erstellt', title: 'Titel (A–Z)' };
@@ -109,6 +109,13 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport }: Props) {
   return (
     <section className="flex h-full min-w-0 flex-col bg-surface" aria-label="Notizenliste">
       <header className="space-y-3 border-b border-line px-4 pb-3 pt-4">
+        {/* Auf Handy/Tablet ist die Seitenleiste eingeklappt – App-Name daher hier zeigen */}
+        <div className="flex items-center gap-2 lg:hidden">
+          <BrandMark size={22} />
+          <span className="text-sm font-semibold tracking-tight">
+            Notizen <span className="font-medium text-accent">by Jorge</span>
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <button className="icon-btn -ml-2 lg:hidden" onClick={onOpenNav} aria-label="Navigation öffnen">
             <MenuIcon size={20} />

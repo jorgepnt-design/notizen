@@ -4,7 +4,7 @@ import './globals.css';
 import { TOUCH_ICON } from './touch-icon';
 
 export const metadata: Metadata = {
-  title: 'Notizen',
+  title: 'Notizen by Jorge',
   description: 'Notizen schreiben, ordnen und wiederfinden – gespeichert lokal in deinem Browser.',
 };
 
@@ -29,7 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href={TOUCH_ICON} sizes="180x180" type="image/png" />
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="Notizen" />
+        <meta name="apple-mobile-web-app-title" content="Notizen by Jorge" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png" />
       </head>

@@ -230,10 +230,10 @@ export function Sidebar({ onNavigate, onNewNote, onOpenSettings, onClose }: Prop
   return (
     <nav className="flex h-full flex-col bg-sunken/60" aria-label="Navigation">
       <div className="flex items-center gap-2.5 px-4 pb-3 pt-4">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-on-accent shadow-sm">
-          <FileText size={17} strokeWidth={2.4} />
+        <BrandMark />
+        <span className="text-[15px] font-semibold tracking-tight">
+          Notizen <span className="font-medium text-accent">by Jorge</span>
         </span>
-        <span className="text-[15px] font-semibold tracking-tight">Notizen</span>
         {onClose && (
           <button className="icon-btn ml-auto" onClick={onClose} aria-label="Navigation schließen">
             <X size={18} />
@@ -349,6 +349,14 @@ export function Sidebar({ onNavigate, onNewNote, onOpenSettings, onClose }: Prop
         </p>
       </div>
     </nav>
+  );
+}
+
+/** App-Icon als Logo (dasselbe Bild wie auf dem Home-Bildschirm) */
+export function BrandMark({ size = 32 }: { size?: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- statischer Export, kein Bild-Optimierer
+    <img src="/icon-192.png" alt="" width={size} height={size} className="shrink-0 rounded-lg shadow-sm" />
   );
 }
 

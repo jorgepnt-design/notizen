@@ -1,4 +1,4 @@
-# Notizen
+# Notizen by Jorge
 
 Eine deutschsprachige Notizen-App für den Browser, angelehnt an die übersichtliche Arbeitsweise von Evernote: links die Navigation, in der Mitte die Notizenliste, rechts ein großer Editor. Notizen aus **Joplin** lassen sich per `.jex`-Export übernehmen.
 
