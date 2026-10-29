@@ -132,6 +132,26 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
     setSelecting(true);
     setPicked(new Set(id ? [id] : []));
   };
+  const allPicked = notes.length > 0 && picked.size === notes.length;
+  const toggleAll = () => setPicked(allPicked ? new Set() : new Set(notes.map(n => n.id)));
+
+  // Strg/⌘ + A wählt im Auswahlmodus alle Notizen der Ansicht aus
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a' && !t.isContentEditable && !/^(INPUT|TEXTAREA)$/.test(t.tagName)) {
+        e.preventDefault();
+        setPicked(new Set(notes.map(n => n.id)));
+      } else if (e.key === 'Escape' && !document.querySelector('[role=dialog]')) {
+        setSelecting(false);
+        setPicked(new Set());
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selecting, notes]);
+
   const stopSelecting = () => {
     setSelecting(false);
     setPicked(new Set());
@@ -354,8 +374,9 @@ export function NoteList({ onOpenNav, onOpened, onNewNote, onImport, onBack, onR
       {selecting && (
         <div className="flex items-center gap-2 border-b border-line bg-accent-soft/60 px-4 py-2 text-sm" role="status">
           <span className="flex-1 font-medium text-accent-strong">{picked.size ? `${picked.size} ausgewählt` : 'Notizen antippen zum Auswählen'}</span>
-          <button className="btn-ghost px-2 py-1 text-xs" onClick={() => setPicked(picked.size === notes.length ? new Set() : new Set(notes.map(n => n.id)))}>
-            {picked.size === notes.length ? 'Keine' : 'Alle'}
+          <button className="btn-secondary px-2.5 py-1 text-xs" onClick={toggleAll} title="Alle auswählen (Strg/⌘ + A)">
+            {allPicked ? <Square size={14} /> : <CheckSquare size={14} />}
+            {allPicked ? 'Auswahl aufheben' : `Alle auswählen (${notes.length})`}
           </button>
           <button className="icon-btn h-8 w-8" onClick={stopSelecting} aria-label="Auswahl beenden">
             <X size={16} />

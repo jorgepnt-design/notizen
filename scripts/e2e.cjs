@@ -288,6 +288,10 @@ const log = (...a) => console.log('✔', ...a);
   await p2.waitForTimeout(700);
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await expect(p2.getByText('1 ausgewählt').isVisible(), 'Langes Drücken startet die Mehrfachauswahl');
+  await p2.getByRole('button', { name: /Alle auswählen/ }).click();
+  await expect(p2.getByText(/^\d+ ausgewählt$/).innerText().then(t => parseInt(t) === 4), '„Alle auswählen“ wählt alle Notizen der Ansicht');
+  await p2.getByRole('button', { name: 'Auswahl aufheben' }).click();
+  await expect(p2.getByText('Notizen antippen zum Auswählen').isVisible(), '„Auswahl aufheben“ leert die Auswahl');
   await p2.screenshot({ path: shots + '/10-phone-select.png' });
 
   // Tablet
